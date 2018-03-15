@@ -2,18 +2,37 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const morgan = require('morgan');
 const mysql = require('mysql');
+const config = require('./config');
 
-var con = mysql.createConnection({
-  host: 'localhost',
-  user: 'root',
-  password: 'root',
-  database: 'wordpressA'
-});
+var con;
+var db_config = {
+  host: config.database.host,
+  user: config.database.user,
+  password: config.database.password,
+  database: config.database.database
+};
 
-con.connect(function(err) {
-  if (err) throw err;
-  console.log('Connected to MySQL database');
-});
+function handleDisconnect() {
+  con = mysql.createConnection(db_config);
+
+  con.connect(function(err) {
+    if(err) {
+      console.log('Error connecting to DB');
+      setTimeout(handleDisconnect, 2000);
+    }
+  });
+
+  con.on('error', function(err) {
+    console.log('Database error: err');
+    if(err.code === 'PROTOCOL_CONNECTION_LOST' || err.code === 'ECONNREFUSED') {
+      handleDisconnect();
+    } else {
+      throw err;
+    }
+  });
+}
+
+handleDisconnect();
 
 // initialise app
 const app = express();
@@ -29,8 +48,15 @@ app.get('/', (req, res, next) => {
 
 app.get('/users', (req, res, next) => {
   con.query('select * from wp_users', (err, result, fields) => {
-    if (err) throw err;
-    res.send(result);
+    if (err) {
+      if(err.code === 'PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR') {
+        handleDisconnect();
+      } else {
+        throw err;
+      }
+    } else {
+      res.send(result);
+    }
   });
 });
 
@@ -41,6 +67,6 @@ app.get('/terms', (req, res, next) => {
   });
 });
 
-app.listen(3000, () => {
-  console.log('Server is listening on port 3000');
+app.listen(config.server.port, () => {
+  console.log(`Server is listening on port ${config.server.port}`);
 });
