@@ -2,37 +2,9 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const morgan = require('morgan');
 const mysql = require('mysql');
+const camelcaseKeys = require('camelcase-keys');
 const config = require('./config');
-
-var con;
-var db_config = {
-  host: config.database.host,
-  user: config.database.user,
-  password: config.database.password,
-  database: config.database.database
-};
-
-function handleDisconnect() {
-  con = mysql.createConnection(db_config);
-
-  con.connect(function(err) {
-    if(err) {
-      console.log('Error connecting to DB');
-      setTimeout(handleDisconnect, 2000);
-    }
-  });
-
-  con.on('error', function(err) {
-    console.log('Database error: err');
-    if(err.code === 'PROTOCOL_CONNECTION_LOST' || err.code === 'ECONNREFUSED') {
-      handleDisconnect();
-    } else {
-      throw err;
-    }
-  });
-}
-
-handleDisconnect();
+const con = require('./lib/db');
 
 // initialise app
 const app = express();
@@ -49,22 +21,21 @@ app.get('/', (req, res, next) => {
 app.get('/students', (req, res, next) => {
   con.query('select * from students', (err, result, fields) => {
     if (err) res.status(500).send(err);
-    res.send(result);
+    res.send(camelcaseKeys(result));
+    //res.send(result[0].FULL_NAME);
   });
 });
 
-app.get('/students/:id', (req, res, next) => {
-  var id = req.params.id;
-  con.query(`select * from students where CONTACT_ID=${id}`, (err, result, fields) => {
+app.get('/students/:contactId', (req, res, next) => {
+  var contactId = req.params.contactId;
+  con.query(`select * from students where CONTACT_ID=${contactId}`, (err, result, fields) => {
     if (err) res.status(500).send(err);
-    res.send(result);
-  });
-});
-
-app.get('/terms', (req, res, next) => {
-  con.query('select * from wp_terms', (err, result, fields) => {
-    if (err) res.status(500).send(err);
-    res.send(result);
+    if (result.length < 1) {
+      //result not found
+      res.status(404).send(`${req.path} not found`);
+    } else {
+      res.send(camelcaseKeys(result));
+    }
   });
 });
 
