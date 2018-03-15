@@ -46,23 +46,24 @@ app.get('/', (req, res, next) => {
   res.send('Hello World');
 });
 
-app.get('/users', (req, res, next) => {
-  con.query('select * from wp_users', (err, result, fields) => {
-    if (err) {
-      if(err.code === 'PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR') {
-        handleDisconnect();
-      } else {
-        throw err;
-      }
-    } else {
-      res.send(result);
-    }
+app.get('/students', (req, res, next) => {
+  con.query('select * from students', (err, result, fields) => {
+    if (err) res.status(500).send(err);
+    res.send(result);
+  });
+});
+
+app.get('/students/:id', (req, res, next) => {
+  var id = req.params.id;
+  con.query(`select * from students where CONTACT_ID=${id}`, (err, result, fields) => {
+    if (err) res.status(500).send(err);
+    res.send(result);
   });
 });
 
 app.get('/terms', (req, res, next) => {
   con.query('select * from wp_terms', (err, result, fields) => {
-    if (err) throw err;
+    if (err) res.status(500).send(err);
     res.send(result);
   });
 });
