@@ -20,13 +20,19 @@ app.get('/', (req, res, next) => {
 app.get('/students', auth, (req, res, next) => {
   jwt.verify(req.token, config.jwt.secretkey, (err, authData) => {
     if (err) {
-      res.status(403).send(err);
+      res.status(401).send(err);
     } else {
-      con.query('select * from students', (err, result, fields) => {
-        if (err) res.status(500).send(err);
-        res.json(camelcaseKeys(result));
-        //res.send(result[0].FULL_NAME);
-      });
+      // Authorise user
+      if(!authData.user.roles.includes(req.path.toString())){
+        res.status(403).send('You are not authorised to access this API');
+      } else {
+
+        con.query('select * from students', (err, result, fields) => {
+          if (err) res.status(500).send(err);
+          res.json(camelcaseKeys(result));
+          //res.send(result[0].FULL_NAME);
+        });
+      }
     }
   });
 });
@@ -45,14 +51,20 @@ app.get('/students/:contactId', (req, res, next) => {
 });
 
 app.get('/api', auth, (req, res, next) => {
+  // Authenticate user
   jwt.verify(req.token, config.jwt.secretkey, (err, authData) => {
     if (err) {
-      res.status(403).send(err);
+      res.status(401).send(err);
     } else {
-      res.json({
-        message: 'You\'ve made it to the protected area...',
-        authData
-      });
+      // Authorise user
+      if(!authData.user.roles.includes(req.path.toString())){
+        res.status(403).send('You are not authorised to access this API');
+      } else {
+        res.json({
+          message: 'You\'ve made it to the protected area...',
+          authData
+        });
+      }
     }
   });
 });
@@ -63,7 +75,17 @@ app.post('/api/login', (req, res, next) => {
   const user = {
     id: 1,
     username: 'james',
-    email: 'james@gmail.com'
+    email: 'james@gmail.com',
+    roles: [
+      'admin',
+      '/api',
+      '/students'
+    ],
+    permissions: [
+      'read',
+      'write',
+      'delete'
+    ]
   }
   // Generate a signed token
   jwt.sign({user: user}, config.jwt.secretkey, (err, token) => {
@@ -88,6 +110,10 @@ function auth(req, res, next) {
     // Get token from array
     const bearerToken = bearer[1];
     req.token = bearerToken;
+    // Check if they are authorised to access this req.path
+    console.log(req.path.toString());
+    // look up their permissions from the db
+
     // Next middleware
     next();
   } else {
